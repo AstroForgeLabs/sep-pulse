@@ -1,0 +1,90 @@
+==============================================================================
+SEP-Pulse GitHub Backlog Issues (Copy & Paste Text File)
+==============================================================================
+
+------------------------------------------------------------------------------
+ISSUE #1
+------------------------------------------------------------------------------
+TITLE:
+feat(contract): implement TTL extension for persistent SLA records
+
+LABELS:
+enhancement, contract, soroban
+
+BODY:
+### Summary
+Add automatic storage TTL extension calls to `record_attestation` in `contracts/sla_registry` to ensure persistent anchor SLA records do not expire on ledger.
+
+### Acceptance Criteria
+- [ ] Call `env.storage().persistent().extend_ttl()` whenever `record_attestation` is invoked.
+- [ ] Add unit test verifying TTL extension on existing SLA records.
+- [ ] Contract compiles cleanly without warnings.
+
+### Tech Stack
+- Rust, Soroban SDK v20.0.0
+
+
+------------------------------------------------------------------------------
+ISSUE #2
+------------------------------------------------------------------------------
+TITLE:
+feat(runner): integrate raw @stellar/anchor-tests CLI assertion runner
+
+LABELS:
+enhancement, runner, typescript
+
+BODY:
+### Summary
+Bridge `packages/runner` directly with `@stellar/anchor-tests` execution engine to allow running full SEP-10 auth challenge validation against live testnet domain endpoints.
+
+### Acceptance Criteria
+- [ ] Export `runAnchorTests(domain: string, seps: number[])` from `packages/runner`.
+- [ ] Parse JSON output into `AnchorComplianceResult` format.
+- [ ] Add node unit test covering testnet execution.
+
+### Tech Stack
+- TypeScript, Node.js v20, @stellar/anchor-tests
+
+
+------------------------------------------------------------------------------
+ISSUE #3
+------------------------------------------------------------------------------
+TITLE:
+feat(api): implement 15-minute cron scheduler and webhook notification dispatcher
+
+LABELS:
+enhancement, api, backend
+
+BODY:
+### Summary
+Build a background cron process in `apps/api` that automatically checks registered anchor domains every 15 minutes and dispatches HTTP POST webhooks on SLA degradation.
+
+### Acceptance Criteria
+- [ ] Scheduled cron loop querying all configured anchors.
+- [ ] Webhook payload contains domain, SLA score, timestamp, and degraded status.
+- [ ] Handle network timeouts gracefully with exponential backoff.
+
+### Tech Stack
+- Node.js, Express, TypeScript
+
+
+------------------------------------------------------------------------------
+ISSUE #4
+------------------------------------------------------------------------------
+TITLE:
+feat(web): add interactive anchor search and historical SLA latency chart
+
+LABELS:
+enhancement, frontend, react
+
+BODY:
+### Summary
+Enhance `apps/web` status page with a real-time domain search input and SVG latency trend chart for monitored anchors.
+
+### Acceptance Criteria
+- [ ] Domain search filter updating the health matrix table dynamically.
+- [ ] Response latency visualization chart per anchor.
+- [ ] Responsive dark glassmorphism UI layout.
+
+### Tech Stack
+- Next.js, React, CSS Modules
