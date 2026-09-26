@@ -1,6 +1,6 @@
 # SEP-Pulse — Continuous Anchor Observability & Soroban SLA Registry
 
-[![CI](https://github.com/SmartCraftGroup/sep-pulse/actions/workflows/ci.yml/badge.svg)](https://github.com/SmartCraftGroup/sep-pulse/actions/workflows/ci.yml)
+[![CI](https://github.com/AstroForgeLabs/sep-pulse/actions/workflows/ci.yml/badge.svg)](https://github.com/AstroForgeLabs/sep-pulse/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-v20%2B-green.svg)](https://nodejs.org/)
 [![Soroban](https://img.shields.io/badge/Soroban-Smart%20Contracts-purple.svg)](https://soroban.stellar.org/)
@@ -108,7 +108,7 @@ sep-pulse/
 
 We welcome community contributions! Please read [`CONTRIBUTING.md`](./CONTRIBUTING.md) before submitting a pull request.
 
-[![Contributors](https://contrib.rocks/image?repo=SmartCraftGroup/sep-pulse)](https://github.com/SmartCraftGroup/sep-pulse/graphs/contributors)
+[![Contributors](https://contrib.rocks/image?repo=AstroForgeLabs/sep-pulse)](https://github.com/AstroForgeLabs/sep-pulse/graphs/contributors)
 
 ---
 

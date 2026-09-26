@@ -20,7 +20,7 @@ We expect all contributors to adhere to a respectful, welcoming, and collaborati
 ### 2. Setting Up the Local Workspace
 ```bash
 # Clone the repository
-git clone https://github.com/SmartCraftGroup/sep-pulse.git
+git clone https://github.com/AstroForgeLabs/sep-pulse.git
 cd sep-pulse
 
 # Install dependencies
