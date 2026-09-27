@@ -1,6 +1,11 @@
 #![no_std]
 use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env, Symbol};
 
+/// Number of ledgers to extend TTL by on each attestation (~30 days at ~5s/ledger)
+const BUMP_AMOUNT: u32 = 518_400;
+/// Only extend TTL if fewer than this many ledgers remain (~7 days)
+const MIN_TTL: u32 = 120_960;
+
 #[contracttype]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SLARecord {
@@ -29,6 +34,8 @@ impl SLARegistryContract {
             panic!("Already initialized");
         }
         env.storage().instance().set(&DataKey::Admin, &admin);
+        // Extend instance storage TTL so the contract stays alive
+        env.storage().instance().extend_ttl(MIN_TTL, BUMP_AMOUNT);
     }
 
     /// Record a health attestation for a given Stellar anchor domain.
@@ -77,8 +84,11 @@ impl SLARegistryContract {
         // Compute integer percentage SLA score (0-100)
         record.sla_score = (record.healthy_checks * 100) / record.total_checks;
 
-        // Save updated SLA record in persistent storage
+        // Save updated SLA record and extend its TTL so it never expires
         env.storage().persistent().set(&key, &record);
+        env.storage().persistent().extend_ttl(&key, MIN_TTL, BUMP_AMOUNT);
+        // Also keep instance (admin) storage alive
+        env.storage().instance().extend_ttl(MIN_TTL, BUMP_AMOUNT);
 
         // Emit telemetry event
         env.events().publish(

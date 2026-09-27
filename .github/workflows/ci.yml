@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ─────────────────────────────────────────────
+  # TypeScript / Node packages
+  # ─────────────────────────────────────────────
+  node:
+    name: Node.js Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build all packages
+        run: npm run build --workspaces --if-present
+
+      - name: Run tests
+        run: npm test --workspaces --if-present
+
+  # ─────────────────────────────────────────────
+  # Soroban / Rust smart contract
+  # ─────────────────────────────────────────────
+  soroban:
+    name: Soroban Contract Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            contracts/sla_registry/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('contracts/sla_registry/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Run contract unit tests
+        run: cargo test --manifest-path contracts/sla_registry/Cargo.toml
+
+      - name: Build WASM release artifact
+        run: cargo build --manifest-path contracts/sla_registry/Cargo.toml --target wasm32-unknown-unknown --release

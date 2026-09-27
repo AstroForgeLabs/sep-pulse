@@ -1,12 +1,16 @@
 /**
  * SEP-Pulse Runner Package
- * Wrapper engine for executing Stellar SEP compliance validations and SLA telemetry.
+ * Wrapper engine for executing real Stellar SEP compliance validations
+ * using @stellar/anchor-tests and publishing SLA telemetry.
  */
+
+import { run, Config, TestRun, SEP } from '@stellar/anchor-tests';
 
 export interface TestAssertionResult {
   sep: number;
   testName: string;
   passed: boolean;
+  skipped: boolean;
   durationMs: number;
   error?: string;
 }
@@ -19,6 +23,7 @@ export interface AnchorComplianceResult {
   totalTests: number;
   passedTests: number;
   failedTests: number;
+  skippedTests: number;
   averageLatencyMs: number;
   sepsTested: number[];
   assertions: TestAssertionResult[];
@@ -28,34 +33,99 @@ export interface RunnerOptions {
   domain: string;
   seps?: number[];
   timeoutMs?: number;
+  verbose?: boolean;
 }
 
 /**
- * Executes continuous validation and SLA telemetry check against an Anchor domain.
+ * Executes real SEP compliance validation against an Anchor domain
+ * using the official @stellar/anchor-tests library.
  */
 export async function runAnchorComplianceCheck(
   options: RunnerOptions
 ): Promise<AnchorComplianceResult> {
-  const { domain, seps = [1, 10, 24, 31, 38], timeoutMs = 15000 } = options;
-  const startTime = Date.now();
+  const { domain, seps = [1, 10, 24, 31, 38], verbose = false } = options;
   const assertions: TestAssertionResult[] = [];
 
-  // 1. Validate SEP-1 (stellar.toml)
-  const sep1Result = await validateSEP1(domain, timeoutMs);
-  assertions.push(...sep1Result);
+  // Filter to only the SEPs supported by the anchor-tests library
+  const supportedSEPs: SEP[] = [1, 6, 10, 12, 24, 31, 38];
+  const sepsToTest = seps.filter((s): s is SEP =>
+    supportedSEPs.includes(s as SEP)
+  );
 
-  // 2. Mock/Execute SEP-10, 24, 31, 38 assertions
-  for (const sep of seps.filter((s) => s !== 1)) {
-    const sepResult = await validateGenericSEP(domain, sep, timeoutMs);
-    assertions.push(...sepResult);
+  const config: Config = {
+    homeDomain: domain,
+    seps: sepsToTest,
+    verbose,
+  };
+
+  try {
+    for await (const testRun of run(config)) {
+      assertions.push(mapTestRun(testRun));
+    }
+  } catch (err: any) {
+    // If the runner fails catastrophically (e.g. network unreachable),
+    // record a single synthetic failure so the caller gets meaningful data.
+    assertions.push({
+      sep: 1,
+      testName: 'Anchor Reachability',
+      passed: false,
+      skipped: false,
+      durationMs: 0,
+      error: err?.message || 'Failed to connect to anchor',
+    });
   }
 
-  const passedTests = assertions.filter((a) => a.passed).length;
-  const totalTests = assertions.length;
+  return buildResult(domain, seps, assertions);
+}
+
+/**
+ * Maps a raw TestRun from @stellar/anchor-tests to our internal assertion shape.
+ */
+function mapTestRun(testRun: TestRun): TestAssertionResult {
+  const { test, result } = testRun;
+  const skipped = result.skipped === true;
+  const passed = !skipped && result.failure == null;
+
+  const latencyMs =
+    result.networkCalls.reduce((acc: number, call) => {
+      // Each NetworkCall may expose timing via headers or we fall back to 0
+      const timing = (call as any)?.durationMs ?? 0;
+      return acc + timing;
+    }, 0) || 0;
+
+  return {
+    sep: test.sep,
+    testName: `${test.group} › ${test.assertion}`,
+    passed,
+    skipped,
+    durationMs: latencyMs,
+    error: result.failure
+      ? result.failure.text(result.failure as any)
+      : undefined,
+  };
+}
+
+/**
+ * Aggregates assertion results into the final AnchorComplianceResult.
+ */
+function buildResult(
+  domain: string,
+  requestedSeps: number[],
+  assertions: TestAssertionResult[]
+): AnchorComplianceResult {
+  const nonSkipped = assertions.filter((a) => !a.skipped);
+  const passedTests = nonSkipped.filter((a) => a.passed).length;
+  const totalTests = nonSkipped.length;
   const failedTests = totalTests - passedTests;
+  const skippedTests = assertions.filter((a) => a.skipped).length;
+
   const slaScore = totalTests > 0 ? Math.round((passedTests / totalTests) * 100) : 0;
-  const totalLatency = assertions.reduce((acc, curr) => acc + curr.durationMs, 0);
-  const averageLatencyMs = totalTests > 0 ? Math.round(totalLatency / totalTests) : 0;
+
+  const latencies = nonSkipped.map((a) => a.durationMs).filter((d) => d > 0);
+  const averageLatencyMs =
+    latencies.length > 0
+      ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length)
+      : 0;
 
   let overallStatus: 'HEALTHY' | 'DEGRADED' | 'DOWN' = 'HEALTHY';
   if (slaScore < 50) {
@@ -72,88 +142,9 @@ export async function runAnchorComplianceCheck(
     totalTests,
     passedTests,
     failedTests,
+    skippedTests,
     averageLatencyMs,
-    sepsTested: seps,
+    sepsTested: requestedSeps,
     assertions,
   };
-}
-
-async function validateSEP1(
-  domain: string,
-  timeoutMs: number
-): Promise<TestAssertionResult[]> {
-  const start = Date.now();
-  const url = `https://${domain}/.well-known/stellar.toml`;
-
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timer);
-    const durationMs = Date.now() - start;
-
-    if (res.ok) {
-      const text = await res.text();
-      const hasSigningKey = text.includes('FEDERATION_SERVER') || text.includes('TRANSFER_SERVER') || text.includes('WEB_AUTH_ENDPOINT');
-      return [
-        {
-          sep: 1,
-          testName: 'stellar.toml HTTPS Availability & CORS',
-          passed: true,
-          durationMs,
-        },
-        {
-          sep: 1,
-          testName: 'stellar.toml Essential Field Definitions',
-          passed: hasSigningKey,
-          durationMs: 5,
-          error: hasSigningKey ? undefined : 'Missing standard SEP endpoints in stellar.toml',
-        },
-      ];
-    } else {
-      return [
-        {
-          sep: 1,
-          testName: 'stellar.toml HTTPS Availability',
-          passed: false,
-          durationMs,
-          error: `HTTP ${res.status} ${res.statusText}`,
-        },
-      ];
-    }
-  } catch (err: any) {
-    return [
-      {
-        sep: 1,
-        testName: 'stellar.toml HTTPS Resolution',
-        passed: false,
-        durationMs: Date.now() - start,
-        error: err.message || 'Network unreachable',
-      },
-    ];
-  }
-}
-
-async function validateGenericSEP(
-  domain: string,
-  sep: number,
-  _timeoutMs: number
-): Promise<TestAssertionResult[]> {
-  const start = Date.now();
-  // Simulated assertion telemetry wrapper for SEP-10, 24, 31, 38
-  const testNames: Record<number, string[]> = {
-    10: ['SEP-10 Challenge Auth Transaction Spec', 'SEP-10 JWT Token Verification'],
-    24: ['SEP-24 /info Endpoint Schema', 'SEP-24 Deposit/Withdraw Interactive URL Response'],
-    31: ['SEP-31 Direct Payment Schema', 'SEP-31 Customer Info Endpoint Validation'],
-    38: ['SEP-38 RFQ Quote Price Query', 'SEP-38 Asset Pair Discovery'],
-  };
-
-  const names = testNames[sep] || [`SEP-${sep} Endpoint Health`];
-  return names.map((testName, i) => ({
-    sep,
-    testName,
-    passed: true,
-    durationMs: 40 + i * 15,
-  }));
 }

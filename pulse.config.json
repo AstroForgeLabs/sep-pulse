@@ -1,0 +1,13 @@
+{
+  "anchors": [
+    "testanchor.stellar.org",
+    "ultrastellar.com"
+  ],
+  "seps": [1, 10, 24, 31, 38],
+  "intervalMinutes": 15,
+  "webhooks": [],
+  "alerts": {
+    "degradedThreshold": 90,
+    "downThreshold": 50
+  }
+}
