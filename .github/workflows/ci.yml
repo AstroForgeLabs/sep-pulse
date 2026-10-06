@@ -44,9 +44,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+      - name: Read pinned Rust toolchain
+        id: pin
+        run: echo "channel=$(sed -n 's/^channel = "\(.*\)"$/\1/p' contracts/sla_registry/rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
+
+      - name: Install Rust toolchain
+        id: toolchain
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: ${{ steps.pin.outputs.channel }}
           targets: wasm32-unknown-unknown
 
       - name: Cache cargo registry
@@ -56,11 +62,11 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             contracts/sla_registry/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('contracts/sla_registry/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-${{ hashFiles('contracts/sla_registry/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
       - name: Run contract unit tests
-        run: cargo test --manifest-path contracts/sla_registry/Cargo.toml
+        run: cargo test --locked --manifest-path contracts/sla_registry/Cargo.toml
 
       - name: Build WASM release artifact
-        run: cargo build --manifest-path contracts/sla_registry/Cargo.toml --target wasm32-unknown-unknown --release
+        run: cargo build --locked --manifest-path contracts/sla_registry/Cargo.toml --target wasm32-unknown-unknown --release

@@ -1,6 +1,5 @@
 # Node dependencies
 node_modules/
-package-lock.json
 
 # Build outputs & dist
 dist/
@@ -10,7 +9,6 @@ out/
 # Rust / Cargo build artifacts
 target/
 contracts/sla_registry/target/
-Cargo.lock
 
 # Environment & IDE
 .env
